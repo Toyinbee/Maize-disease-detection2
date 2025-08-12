@@ -13,7 +13,7 @@ import tensorflow as tf
 # -------------------------
 # CONFIG
 # -------------------------
-TFLITE_MODEL_PATH = Maize_model_h5_reduced.tflite"   # <-- change to your tflite filename
+TFLITE_MODEL_PATH = "Maize_model_h5_reduced.tflite"   # <-- change to your tflite filename
 IMG_SIZE = (224, 224)
 RESULTS_DIR = Path("results")
 IMAGES_DIR = RESULTS_DIR / "images"
