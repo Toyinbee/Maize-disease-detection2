@@ -108,17 +108,29 @@ def save_result_record(image_bytes: bytes, filename: str, predicted: str, confid
 
 def annotate_image(img: Image.Image, text: str):
     draw = ImageDraw.Draw(img)
+
+    # Try to load a proper font
     try:
         font = ImageFont.truetype("DejaVuSans.ttf", size=20)
     except Exception:
         font = ImageFont.load_default()
-    w, h = img.size
+
     padding = 8
-    text_w, text_h = draw.textsize(text, font=font)
-    rect_h = text_h + 2*padding
-    # semi-transparent rectangle (solid for PNG)
-    draw.rectangle([(0,0),(w, rect_h)], fill=(0,0,0))
+
+    # Get text size with textbbox (works on Pillow ≥10)
+    bbox = draw.textbbox((0, 0), text, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+
+    # Draw rectangle background for text
+    rect_h = text_h + 2 * padding
+    w, _ = img.size
+    draw.rectangle([(0, 0), (w, rect_h)], fill=(0, 0, 0))
+
+    # Draw the text on top
     draw.text((padding, padding), text, fill="white", font=font)
+
+    # Return as bytes
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
