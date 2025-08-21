@@ -18,7 +18,7 @@ IMG_SIZE = (224, 224)
 RESULTS_DIR = Path("results")
 IMAGES_DIR = RESULTS_DIR / "images"
 CSV_PATH = RESULTS_DIR / "results.csv"
-CONFIDENCE_THRESHOLD = 0.50  # fallback threshold (50%)
+CONFIDENCE_THRESHOLD = 0.50  # fixed at 50%
 
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
@@ -109,28 +109,21 @@ def save_result_record(image_bytes: bytes, filename: str, predicted: str, confid
 def annotate_image(img: Image.Image, text: str):
     draw = ImageDraw.Draw(img)
 
-    # Try to load a proper font
     try:
         font = ImageFont.truetype("DejaVuSans.ttf", size=20)
     except Exception:
         font = ImageFont.load_default()
 
     padding = 8
-
-    # Get text size with textbbox (works on Pillow ≥10)
     bbox = draw.textbbox((0, 0), text, font=font)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
 
-    # Draw rectangle background for text
     rect_h = text_h + 2 * padding
     w, _ = img.size
     draw.rectangle([(0, 0), (w, rect_h)], fill=(0, 0, 0))
-
-    # Draw the text on top
     draw.text((padding, padding), text, fill="white", font=font)
 
-    # Return as bytes
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
@@ -151,8 +144,6 @@ col1, col2 = st.columns([2, 1])
 
 with col1:
     uploaded = st.file_uploader("📤 Upload maize leaf image", type=["jpg","jpeg","png"])
-    threshold = st.slider("Confidence fallback threshold (%)", min_value=30, max_value=90, value=int(CONFIDENCE_THRESHOLD*100))
-    CONFIDENCE_THRESHOLD = threshold / 100.0
 
     if uploaded is not None:
         image = Image.open(uploaded).convert("RGB")
@@ -169,7 +160,6 @@ with col1:
                 display_label = pred_label if is_known else "Unknown / Not in model"
                 confidence_pct = top_prob * 100
 
-            # Display only the TOP prediction (big and user-friendly)
             st.markdown(
                 f"""
                 <div style="background:#f7f9f8; padding:18px; border-radius:10px; border:1px solid #e6efe6;">
@@ -180,17 +170,14 @@ with col1:
                 unsafe_allow_html=True
             )
 
-            # progress bar for confidence
             prog = st.progress(min(100, max(0, int(confidence_pct))))
             prog.progress(int(confidence_pct))
 
-            # Show disease advice if known, otherwise fallback
             if display_label in disease_info:
                 st.info(disease_info[display_label])
             else:
                 st.warning("This image's top prediction is below the confidence threshold or not recognized. Try a clearer image or different angle.")
 
-            # OPTIONAL: allow user to view full probabilities in an expander (hidden by default)
             with st.expander("🔽 Show full class probabilities (advanced)"):
                 prob_df = pd.DataFrame({
                     "class": class_labels,
@@ -198,17 +185,14 @@ with col1:
                 }).sort_values("probability_%", ascending=False).reset_index(drop=True)
                 st.table(prob_df)
 
-            # Save the result & offer downloads
             uploaded_bytes = uploaded.getvalue() if hasattr(uploaded, "getvalue") else None
             saved_name = save_result_record(uploaded_bytes, uploaded.name, display_label, confidence_pct)
             st.success(f"✅ Result saved as `{saved_name}`")
 
-            # annotated image download
             annotated_text = f"{display_label} — {confidence_pct:.2f}%"
             annotated_bytes = annotate_image(image.copy(), annotated_text)
             st.download_button("⬇️ Download annotated image (PNG)", annotated_bytes, file_name=f"annotated__{saved_name}.png", mime="image/png")
 
-            # single-row CSV download
             one_row_df = pd.DataFrame([{
                 "timestamp_utc": datetime.utcnow().isoformat(),
                 "image_filename": saved_name,
